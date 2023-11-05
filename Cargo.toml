@@ -1,0 +1,25 @@
+[package]
+name = "spl-store"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+no-entrypoint = []
+
+[dependencies]
+borsh = "1.1.1"
+borsh-derive = "1.1.1"
+dotenv = "0.15.0"
+spl-associated-token-account = "2.2.0"
+spl-token = "4.0.0"
+thiserror = "1.0.50"
+
+[dev-dependencies]
+solana-program-test = "1.17.4"
+solana-sdk = "1.17.4"
+
+[lib]
+name = "spl_store"
+crate-type = ["cdylib", "lib"]

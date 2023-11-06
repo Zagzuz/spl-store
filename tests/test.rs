@@ -127,7 +127,7 @@ fn amount_to_lamports(amount: Amount, decimals: u8) -> u64 {
 
 #[tokio::test]
 async fn it_works() {
-    dotenv::dotenv().unwrap();
+    dotenv::dotenv().ok();
 
     // Setup keys ===============================================================
 
@@ -289,7 +289,10 @@ async fn it_works() {
         Some(&payer.pubkey()),
     );
 
-    transaction.sign(&[&payer], recent_blockhash);
+    transaction.sign(
+        &[&payer],
+        banks_client.get_latest_blockhash().await.unwrap(),
+    );
     banks_client.process_transaction(transaction).await.unwrap();
 
     let acc = fetch_account_info_data::<StoreAccount>(&mut banks_client, store.pubkey())
@@ -310,7 +313,10 @@ async fn it_works() {
 
     let mut transaction = Transaction::new(&[&payer], message, recent_blockhash);
 
-    transaction.sign(&[&payer], recent_blockhash);
+    transaction.sign(
+        &[&payer],
+        banks_client.get_latest_blockhash().await.unwrap(),
+    );
     banks_client.process_transaction(transaction).await.unwrap();
 
     let acc = fetch_account_info_data::<StoreAccount>(&mut banks_client, store.pubkey())
@@ -341,7 +347,7 @@ async fn it_works() {
         )],
         Some(&payer.pubkey()),
         &[&payer, &client],
-        recent_blockhash,
+        banks_client.get_latest_blockhash().await.unwrap(),
     );
 
     banks_client.process_transaction(transaction).await.unwrap();
@@ -381,7 +387,7 @@ async fn it_works() {
         )],
         Some(&payer.pubkey()),
         &[&payer, &store],
-        recent_blockhash,
+        banks_client.get_latest_blockhash().await.unwrap(),
     );
 
     banks_client.process_transaction(transaction).await.unwrap();

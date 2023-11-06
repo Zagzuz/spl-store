@@ -11,7 +11,7 @@ use spl_associated_token_account::{
         pubkey::Pubkey,
     },
 };
-use spl_token::instruction::transfer;
+use spl_token::{instruction::transfer, solana_program::program_pack::Pack, state::Account};
 
 use crate::{
     ensure,
@@ -66,13 +66,9 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], amount: Amount) ->
     );
 
     let token_lamports = amount_to_lamports(token_mint_account_info, amount)?;
-    msg!(
-        "token lamports: {}, store ata lamports: {}",
-        token_lamports,
-        store_ata_info.lamports()
-    );
+    let acc_data = Account::unpack(&store_ata_info.data.borrow())?;
     ensure!(
-        store_ata_info.lamports() >= token_lamports,
+        acc_data.amount >= token_lamports,
         SplStoreError::InsufficientFundsForTransaction.into()
     );
 
@@ -133,7 +129,7 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], amount: Amount) ->
         &client_ata_info.key,
         &store_account_info.key,
         &[&store_account_info.key],
-        0,
+        token_lamports,
     )?;
     // [writable] The source account.
     // [writable] The destination account.

@@ -2,7 +2,6 @@ use borsh::{BorshDeserialize, BorshSerialize};
 use eyre::eyre;
 use solana_program_test::{processor, tokio, BanksClient, ProgramTest};
 use solana_sdk::{
-    account::Account,
     hash::Hash,
     instruction::{AccountMeta, Instruction},
     message::Message,
@@ -16,7 +15,10 @@ use solana_sdk::{
 use spl_associated_token_account::{
     get_associated_token_address, instruction::create_associated_token_account,
 };
-use spl_token::{instruction::initialize_mint, state::Mint};
+use spl_token::{
+    instruction::initialize_mint,
+    state::{Account, Mint},
+};
 
 use spl_store::{
     entrypoint::process_instruction,
@@ -95,7 +97,19 @@ async fn mint_amount(
     Ok(())
 }
 
-async fn fetch_account_data<T: BorshDeserialize>(
+async fn unpack_account_data(
+    banks_client: &mut BanksClient,
+    pubkey: Pubkey,
+) -> eyre::Result<Account> {
+    let acc = banks_client
+        .get_account(pubkey)
+        .await?
+        .ok_or(eyre!("get_account() failed"))?;
+    let acc_data = spl_token::state::Account::unpack(&acc.data)?;
+    Ok(acc_data)
+}
+
+async fn fetch_account_info_data<T: BorshDeserialize>(
     banks_client: &mut BanksClient,
     pubkey: Pubkey,
 ) -> eyre::Result<T> {
@@ -158,26 +172,26 @@ async fn it_works() {
 
     program_test.add_account(
         store.pubkey(),
-        Account {
+        solana_sdk::account::Account {
             lamports: 3_200_000_000_000,
             data: store_data,
             owner: program_id,
-            ..Account::default()
+            ..Default::default()
         },
     );
 
     program_test.add_account(
         client.pubkey(),
-        Account {
+        solana_sdk::account::Account {
             lamports: 69_000_000_000,
             owner: program_id,
-            ..Account::default()
+            ..Default::default()
         },
     );
 
     program_test.add_account(
         auth.pubkey(),
-        Account {
+        solana_sdk::account::Account {
             lamports: 1_000_000_000,
             owner: system_program_pubkey,
             ..Default::default()
@@ -206,7 +220,7 @@ async fn it_works() {
 
     // Check uninitialized token price ============================================
 
-    let acc = fetch_account_data::<StoreAccount>(&mut banks_client, store.pubkey())
+    let acc = fetch_account_info_data::<StoreAccount>(&mut banks_client, store.pubkey())
         .await
         .unwrap();
 
@@ -245,7 +259,7 @@ async fn it_works() {
         &token_mint.pubkey(),
         &auth,
         &payer,
-        100_000_000_000f64 as Amount,
+        1 as Amount,
         token_mint_decimals,
     )
     .await
@@ -278,7 +292,7 @@ async fn it_works() {
     transaction.sign(&[&payer], recent_blockhash);
     banks_client.process_transaction(transaction).await.unwrap();
 
-    let acc = fetch_account_data::<StoreAccount>(&mut banks_client, store.pubkey())
+    let acc = fetch_account_info_data::<StoreAccount>(&mut banks_client, store.pubkey())
         .await
         .unwrap();
 
@@ -299,7 +313,7 @@ async fn it_works() {
     transaction.sign(&[&payer], recent_blockhash);
     banks_client.process_transaction(transaction).await.unwrap();
 
-    let acc = fetch_account_data::<StoreAccount>(&mut banks_client, store.pubkey())
+    let acc = fetch_account_info_data::<StoreAccount>(&mut banks_client, store.pubkey())
         .await
         .unwrap();
 
@@ -336,10 +350,18 @@ async fn it_works() {
         banks_client.get_balance(store.pubkey()).await.unwrap(),
         3_199_999_999_813
     );
+    let client_acc_data = unpack_account_data(&mut banks_client, client_ata_pubkey)
+        .await
+        .unwrap();
+    assert_eq!(client_acc_data.amount, 999_999_986);
+    let store_acc_data = unpack_account_data(&mut banks_client, store_ata_pubkey)
+        .await
+        .unwrap();
+    assert_eq!(store_acc_data.amount, 14);
 
     // Sell some tokens =============================================================
 
-    let amount = 0.000_000_087 as Amount;
+    let amount = 0.000_000_007 as Amount;
 
     let transaction = Transaction::new_signed_with_payer(
         &[Instruction::new_with_borsh(
@@ -366,6 +388,14 @@ async fn it_works() {
 
     assert_eq!(
         banks_client.get_balance(store.pubkey()).await.unwrap(),
-        3_200_000_000_976
+        3_199_999_999_906
     );
+    let client_acc_data = unpack_account_data(&mut banks_client, client_ata_pubkey)
+        .await
+        .unwrap();
+    assert_eq!(client_acc_data.amount, 999_999_993);
+    let store_acc_data = unpack_account_data(&mut banks_client, store_ata_pubkey)
+        .await
+        .unwrap();
+    assert_eq!(store_acc_data.amount, 7);
 }

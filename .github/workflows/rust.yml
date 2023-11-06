@@ -54,9 +54,14 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     environment: prod
+    env:
+      PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE }}
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+      - run: |
+          touch .env
+          echo $PROD_ENV_FILE | tr " " "\n" >> .env
       - run: cargo test --workspace

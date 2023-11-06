@@ -17,27 +17,44 @@ use crate::{
     ensure,
     error::SplStoreError,
     store::{account::StoreAccount, Amount},
-    utils::amount_to_lamports,
+    utils::{amount_to_lamports, check_ata_mint},
 };
 
 pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], amount: Amount) -> ProgramResult {
-    let accounts_iter = &mut accounts.iter();
+    let accounts_info_iter = &mut accounts.iter();
 
-    let store_account_info = next_account_info(accounts_iter)?;
+    let funding_account_info = next_account_info(accounts_info_iter)?;
+    let store_account_info = next_account_info(accounts_info_iter)?;
+    let store_ata_info = next_account_info(accounts_info_iter)?;
+    let client_account_info = next_account_info(accounts_info_iter)?;
+    let client_ata_info = next_account_info(accounts_info_iter)?;
+    let token_mint_account_info = next_account_info(accounts_info_iter)?;
+    let system_program_account_info = next_account_info(accounts_info_iter)?;
+    let spl_token_program_account_info = next_account_info(accounts_info_iter)?;
+
+    ensure!(
+        spl_token::check_id(&spl_token_program_account_info.key),
+        ProgramError::IncorrectProgramId
+    );
     ensure!(
         store_account_info.owner == program_id,
         ProgramError::IncorrectProgramId
     );
-
-    let store_ata_info = next_account_info(accounts_iter)?;
-    let client_account_info = next_account_info(accounts_iter)?;
-    let client_ata_info = next_account_info(accounts_iter)?;
-    let token_mint_account_info = next_account_info(accounts_iter)?;
-    let token_program_account_info = next_account_info(accounts_iter)?;
-
     ensure!(
         store_account_info.is_signer,
         SplStoreError::AccountNotSigner.into()
+    );
+    ensure!(
+        store_account_info.is_writable,
+        SplStoreError::AccountNotWritable.into()
+    );
+    ensure!(
+        funding_account_info.is_signer,
+        SplStoreError::AccountNotSigner.into()
+    );
+    ensure!(
+        funding_account_info.is_writable,
+        SplStoreError::AccountNotWritable.into()
     );
     ensure!(
         store_ata_info.is_writable,
@@ -49,26 +66,27 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], amount: Amount) ->
     );
 
     let token_lamports = amount_to_lamports(token_mint_account_info, amount)?;
+    msg!(
+        "token lamports: {}, store ata lamports: {}",
+        token_lamports,
+        store_ata_info.lamports()
+    );
     ensure!(
         store_ata_info.lamports() >= token_lamports,
         SplStoreError::InsufficientFundsForTransaction.into()
     );
 
+    check_ata_mint(store_ata_info, token_mint_account_info)?;
+
     if client_ata_info.lamports() == 0 {
         msg!("Creating client (recipient) ATA...");
-        ensure!(
-            client_account_info.is_signer,
-            SplStoreError::AccountNotSigner.into()
-        );
-        let system_program_account = next_account_info(accounts_iter)?;
-        let spl_token_program_account = next_account_info(accounts_iter)?;
         let create_ata_ix = create_associated_token_account(
-            &client_account_info.key,
+            &funding_account_info.key,
             &client_account_info.key,
             &token_mint_account_info.key,
-            &token_program_account_info.key,
+            &spl_token_program_account_info.key,
         );
-        // [writeable,signer] Funding account (must be a system account)
+        // [writeable, signer] Funding account (must be a system account)
         // [writeable] Associated token account address to be created
         // [] Wallet address for the new associated token account
         // [] The token mint for the new associated token account
@@ -77,15 +95,17 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], amount: Amount) ->
         invoke(
             &create_ata_ix,
             &[
-                client_account_info.clone(),
+                funding_account_info.clone(),
                 client_ata_info.clone(),
                 client_account_info.clone(),
                 token_mint_account_info.clone(),
-                system_program_account.clone(),
-                spl_token_program_account.clone(),
+                system_program_account_info.clone(),
+                spl_token_program_account_info.clone(),
             ],
         )?;
     }
+
+    check_ata_mint(client_ata_info, token_mint_account_info)?;
 
     let price = StoreAccount::get_price(store_account_info)?;
     msg!("Price: {} SOL", price);
@@ -108,12 +128,12 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], amount: Amount) ->
     );
 
     let transfer_ix = transfer(
-        &token_program_account_info.key,
+        &spl_token_program_account_info.key,
         &store_ata_info.key,
         &client_ata_info.key,
         &store_account_info.key,
         &[&store_account_info.key],
-        token_lamports,
+        0,
     )?;
     // [writable] The source account.
     // [writable] The destination account.
@@ -131,5 +151,6 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], amount: Amount) ->
     **client_account_info.try_borrow_mut_lamports()? -= sol_lamports;
     **store_account_info.try_borrow_mut_lamports()? += sol_lamports;
     msg!("Client Account ==[{} SOL]==> Store Account", sol_amount);
+
     Ok(())
 }

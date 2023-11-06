@@ -7,6 +7,8 @@ pub enum SplStoreError {
     AccountNotWritable,
     #[error("Account is not signer")]
     AccountNotSigner,
+    #[error("Account is signer, but should not be")]
+    AccountSigner,
     #[error("Insufficient funds for transaction")]
     InsufficientFundsForTransaction,
     #[error("No initial price")]
@@ -23,6 +25,8 @@ pub enum SplStoreError {
     NoAccountMint,
     #[error("Wrong account mint")]
     WrongAccountMint,
+    #[error("Unexpected ATA address")]
+    UnexpectedAtaAddress,
 }
 
 impl From<SplStoreError> for ProgramError {

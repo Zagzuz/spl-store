@@ -12,8 +12,8 @@ no-entrypoint = []
 borsh = "0.10.3"
 borsh-derive = "0.10.3"
 dotenv = "0.15.0"
-spl-associated-token-account = "2.2.0"
-spl-token = "4.0.0"
+spl-associated-token-account = { version = "2.2.0", features = ["no-entrypoint"] }
+spl-token = { version = "4.0.0", features = ["no-entrypoint"] }
 thiserror = "1.0.50"
 
 [dev-dependencies]

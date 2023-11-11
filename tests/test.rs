@@ -299,7 +299,7 @@ async fn it_works() {
         .await
         .unwrap();
 
-    assert_eq!(acc.price, 42 as Price);
+    assert_eq!(acc.price, initial_price);
 
     // Update token price ===============================================================
 

@@ -18,6 +18,7 @@ use spl_associated_token_account::{
 use spl_token::{
     instruction::initialize_mint,
     state::{Account, Mint},
+    ui_amount_to_amount,
 };
 
 use spl_store::{
@@ -121,10 +122,6 @@ async fn fetch_account_info_data<T: BorshDeserialize>(
     Ok(account_data)
 }
 
-fn amount_to_lamports(amount: Amount, decimals: u8) -> u64 {
-    (amount * f64::powf(10., decimals.into())) as u64
-}
-
 #[tokio::test]
 async fn it_works() {
     dotenv::dotenv().ok();
@@ -212,7 +209,7 @@ async fn it_works() {
         &token_mint,
         &spl_token_program_pubkey,
         &auth.pubkey(),
-        amount_to_lamports(9_000 as Amount, token_mint_decimals),
+        ui_amount_to_amount(9_000 as Amount, token_mint_decimals),
         token_mint_decimals,
     )
     .await

@@ -8,10 +8,15 @@ use spl_token::solana_program::{
 
 use crate::{
     ensure,
-    store::{account::StoreAccount, Price},
+    store::{account::StoreAccount, Amount, Price},
 };
 
-pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], price: Price) -> ProgramResult {
+pub fn process(
+    program_id: &Pubkey,
+    accounts: &[AccountInfo],
+    price: Price,
+    add_sol: Amount,
+) -> ProgramResult {
     msg!("Store initialization");
     let accounts_info_iter = &mut accounts.iter();
 
@@ -22,13 +27,17 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], price: Price) -> P
     let system_program_account_info = next_account_info(accounts_info_iter)?;
     let spl_token_program_account_info = next_account_info(accounts_info_iter)?;
 
+    if store_account_info.lamports() == 0 {
+        StoreAccount::initialize_account(
+            program_id,
+            &[funding_account_info.clone(), store_account_info.clone()],
+            add_sol,
+        )?;
+    }
+
     ensure!(
         store_account_info.owner == program_id,
         ProgramError::IncorrectProgramId
-    );
-    ensure!(
-        store_account_info.lamports() != 0,
-        ProgramError::UninitializedAccount
     );
 
     StoreAccount::update_price(&store_account_info, price)?;

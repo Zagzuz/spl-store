@@ -1,4 +1,4 @@
-use borsh::{BorshDeserialize, BorshSerialize};
+use borsh::BorshDeserialize;
 use eyre::eyre;
 use solana_program_test::{processor, tokio, BanksClient, ProgramTest};
 use solana_sdk::{
@@ -161,22 +161,6 @@ async fn it_works() {
 
     // Add accounts ====================================================================
 
-    let store_data = {
-        let mut store_data = Vec::new();
-        StoreAccount::default().serialize(&mut store_data).unwrap();
-        store_data
-    };
-
-    program_test.add_account(
-        store.pubkey(),
-        solana_sdk::account::Account {
-            lamports: 3_200_000_000_000,
-            data: store_data,
-            owner: program_id,
-            ..Default::default()
-        },
-    );
-
     program_test.add_account(
         client.pubkey(),
         solana_sdk::account::Account {
@@ -215,14 +199,6 @@ async fn it_works() {
     .await
     .unwrap();
 
-    // Check uninitialized token price ============================================
-
-    let acc = fetch_account_info_data::<StoreAccount>(&mut banks_client, store.pubkey())
-        .await
-        .unwrap();
-
-    assert_eq!(acc.price, 0 as Price);
-
     // Create client ATA ==========================================================
 
     let client_ata_create_ix = create_associated_token_account(
@@ -256,7 +232,7 @@ async fn it_works() {
         &token_mint.pubkey(),
         &auth,
         &payer,
-        1.,
+        14.,
         token_mint_decimals,
     )
     .await
@@ -272,11 +248,11 @@ async fn it_works() {
     let mut transaction = Transaction::new_with_payer(
         &[Instruction::new_with_borsh(
             program_id,
-            &SplStoreInstruction::Initialize(initial_price),
+            &SplStoreInstruction::Initialize(initial_price, 32_000_200_000_000),
             vec![
                 AccountMeta::new(payer.pubkey(), true),
                 AccountMeta::new(store_ata_pubkey, false),
-                AccountMeta::new(store.pubkey(), false),
+                AccountMeta::new(store.pubkey(), true),
                 AccountMeta::new(token_mint.pubkey(), false),
                 AccountMeta::new(system_program_pubkey, false),
                 AccountMeta::new(spl_token_program_pubkey, false),
@@ -287,7 +263,7 @@ async fn it_works() {
     );
 
     transaction.sign(
-        &[&payer],
+        &[&payer, &store],
         banks_client.get_latest_blockhash().await.unwrap(),
     );
     banks_client.process_transaction(transaction).await.unwrap();
@@ -297,6 +273,22 @@ async fn it_works() {
         .unwrap();
 
     assert_eq!(acc.price, initial_price);
+
+    // Mint tokens to store ATA ===============================================
+
+    mint_amount(
+        &mut banks_client,
+        recent_blockhash,
+        &spl_token_program_pubkey,
+        &store_ata_pubkey,
+        &token_mint.pubkey(),
+        &auth,
+        &payer,
+        14.,
+        token_mint_decimals,
+    )
+    .await
+    .unwrap();
 
     // Update token price ===============================================================
 
@@ -351,16 +343,16 @@ async fn it_works() {
 
     assert_eq!(
         banks_client.get_balance(store.pubkey()).await.unwrap(),
-        2_682_000_000_000
+        31_482_200_946_560
     );
     let client_acc_data = unpack_account_data(&mut banks_client, client_ata_pubkey)
         .await
         .unwrap();
-    assert_eq!(client_acc_data.amount, 999_999_986);
+    assert_eq!(client_acc_data.amount, 13_999_999_986);
     let store_acc_data = unpack_account_data(&mut banks_client, store_ata_pubkey)
         .await
         .unwrap();
-    assert_eq!(store_acc_data.amount, 14);
+    assert_eq!(store_acc_data.amount, 14_000_000_014);
 
     // Sell some tokens =============================================================
 
@@ -391,14 +383,14 @@ async fn it_works() {
 
     assert_eq!(
         banks_client.get_balance(store.pubkey()).await.unwrap(),
-        2_941_000_000_000
+        31_741_200_946_560
     );
     let client_acc_data = unpack_account_data(&mut banks_client, client_ata_pubkey)
         .await
         .unwrap();
-    assert_eq!(client_acc_data.amount, 999_999_993);
+    assert_eq!(client_acc_data.amount, 13_999_999_993);
     let store_acc_data = unpack_account_data(&mut banks_client, store_ata_pubkey)
         .await
         .unwrap();
-    assert_eq!(store_acc_data.amount, 7);
+    assert_eq!(store_acc_data.amount, 14_000_000_007);
 }

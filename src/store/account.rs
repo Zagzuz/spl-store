@@ -1,3 +1,5 @@
+use std::mem::size_of;
+
 use borsh_derive::{BorshDeserialize, BorshSerialize};
 use spl_associated_token_account::{
     get_associated_token_address,
@@ -6,10 +8,14 @@ use spl_associated_token_account::{
 };
 use spl_token::solana_program::{
     account_info::AccountInfo, entrypoint::ProgramResult, program_error::ProgramError,
-    system_program,
+    pubkey::Pubkey, rent::Rent, system_instruction::create_account, system_program,
 };
 
-use crate::{ensure, error::SplStoreError, store::Price};
+use crate::{
+    ensure,
+    error::SplStoreError,
+    store::{Amount, Price},
+};
 
 #[derive(Debug, Default, BorshSerialize, BorshDeserialize)]
 pub struct StoreAccount {
@@ -32,6 +38,62 @@ impl StoreAccount {
         let store_account: StoreAccount =
             borsh::BorshDeserialize::try_from_slice(&account_info.data.borrow())?;
         Ok(store_account.price)
+    }
+
+    /// /[writeable, signer] Funding account
+    /// /[writeable, signer] New store account
+    pub fn initialize_account(
+        program_id: &Pubkey,
+        account_infos: &[AccountInfo],
+        add_sol: Amount,
+    ) -> ProgramResult {
+        let account_infos_iter = &mut account_infos.iter();
+
+        let funding_account_info = next_account_info(account_infos_iter)?;
+        let store_account_info = next_account_info(account_infos_iter)?;
+
+        ensure!(
+            funding_account_info.is_writable,
+            SplStoreError::AccountNotWritable.into(),
+        );
+        ensure!(
+            funding_account_info.is_signer,
+            SplStoreError::AccountNotSigner.into(),
+        );
+        ensure!(
+            store_account_info.is_writable,
+            SplStoreError::AccountNotWritable.into(),
+        );
+        ensure!(
+            store_account_info.is_signer,
+            SplStoreError::AccountNotSigner.into(),
+        );
+
+        let space = size_of::<StoreAccount>();
+        let rent = Rent::default();
+        let lamports = rent.minimum_balance(space) + add_sol;
+
+        ensure!(
+            rent.is_exempt(lamports, space),
+            ProgramError::AccountNotRentExempt
+        );
+
+        let create_account_ix = create_account(
+            funding_account_info.key,
+            store_account_info.key,
+            lamports,
+            space as u64,
+            program_id,
+        );
+
+        // [WRITE, SIGNER] Funding account
+        // [WRITE, SIGNER] New account
+        invoke(
+            &create_account_ix,
+            &[funding_account_info.clone(), store_account_info.clone()],
+        )?;
+
+        Ok(())
     }
 
     /// - \[writeable, signer] Funding account

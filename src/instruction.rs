@@ -11,7 +11,7 @@ pub enum SplStoreInstruction {
     /// - [] Token Mint account
     /// - [] System program account
     /// - [] SPL Token program account
-    Initialize(Price),
+    Initialize(Price, Amount),
     /// Buy tokens from a client
     /// - \[writeable, signer] Funding account - for ATA
     /// - \[writeable] Store account (sol source) - wallet

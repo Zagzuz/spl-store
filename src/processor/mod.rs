@@ -1,13 +1,14 @@
-mod store_buy;
-mod store_initialize;
-mod store_sell;
-mod store_update_price;
-
-use crate::instruction::SplStoreInstruction;
 use borsh::BorshDeserialize;
 use spl_token::solana_program::{
     account_info::AccountInfo, entrypoint::ProgramResult, pubkey::Pubkey,
 };
+
+use crate::instruction::SplStoreInstruction;
+
+mod store_buy;
+mod store_initialize;
+mod store_sell;
+mod store_update_price;
 
 pub struct Processor;
 
@@ -19,8 +20,8 @@ impl Processor {
     ) -> ProgramResult {
         let instruction = SplStoreInstruction::try_from_slice(instruction_data)?;
         match instruction {
-            SplStoreInstruction::Initialize(price) => {
-                store_initialize::process(program_id, accounts, price)
+            SplStoreInstruction::Initialize(price, add_sol) => {
+                store_initialize::process(program_id, accounts, price, add_sol)
             }
             SplStoreInstruction::Buy(token_amount) => {
                 store_buy::process(program_id, accounts, token_amount)

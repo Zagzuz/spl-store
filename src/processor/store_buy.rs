@@ -19,7 +19,7 @@ use crate::{
     ensure,
     error::SplStoreError,
     store::{account::StoreAccount, Amount},
-    utils::{amount_to_lamports, check_ata_mint},
+    utils::check_ata_mint,
 };
 
 pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], amount: Amount) -> ProgramResult {
@@ -55,10 +55,9 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], amount: Amount) ->
         SplStoreError::AccountNotWritable.into()
     );
 
-    let token_lamports = amount_to_lamports(token_mint_account_info, amount)?;
     let acc_data = Account::unpack(&client_ata_info.data.borrow())?;
     ensure!(
-        acc_data.amount >= token_lamports,
+        acc_data.amount >= amount,
         SplStoreError::InsufficientFundsForTransaction.into()
     );
 
@@ -81,7 +80,7 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], amount: Amount) ->
     let price = StoreAccount::get_price(store_account_info)?;
     msg!("Price: {} SOL", price);
     let sol_amount = amount * price;
-    let sol_lamports = (sol_amount * LAMPORTS_PER_SOL as f64) as u64;
+    let sol_lamports = sol_amount * LAMPORTS_PER_SOL;
     ensure!(
         store_account_info.lamports() >= sol_lamports,
         SplStoreError::InsufficientFundsForTransaction.into()
@@ -104,7 +103,7 @@ pub fn process(program_id: &Pubkey, accounts: &[AccountInfo], amount: Amount) ->
         store_ata_info.key,
         client_account_info.key,
         &[&client_account_info.key],
-        token_lamports,
+        amount,
     )?;
     // [writable] The source account.
     // [writable] The destination account.

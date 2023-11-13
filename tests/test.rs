@@ -24,7 +24,7 @@ use spl_token::{
 use spl_store::{
     entrypoint::process_instruction,
     instruction::SplStoreInstruction,
-    store::{account::StoreAccount, Amount, Price},
+    store::{account::StoreAccount, Price},
 };
 
 async fn create_token_mint(
@@ -73,10 +73,10 @@ async fn mint_amount(
     mint: &Pubkey,
     mint_authority: &Keypair,
     payer: &Keypair,
-    amount: Amount,
+    ui_amount: f64,
     mint_decimals: u8,
 ) -> eyre::Result<()> {
-    let mint_lamports = (amount * f64::powf(10., mint_decimals.into())) as u64;
+    let mint_lamports = ui_amount_to_amount(ui_amount, mint_decimals);
     let mint_ix = spl_token::instruction::mint_to(
         token_program,
         mint,
@@ -209,7 +209,7 @@ async fn it_works() {
         &token_mint,
         &spl_token_program_pubkey,
         &auth.pubkey(),
-        ui_amount_to_amount(9_000 as Amount, token_mint_decimals),
+        ui_amount_to_amount(9_000f64, token_mint_decimals),
         token_mint_decimals,
     )
     .await
@@ -256,7 +256,7 @@ async fn it_works() {
         &token_mint.pubkey(),
         &auth,
         &payer,
-        1 as Amount,
+        1.,
         token_mint_decimals,
     )
     .await
@@ -266,7 +266,7 @@ async fn it_works() {
 
     let initial_price = std::env::var("TOKEN_INITIAL_PRICE")
         .unwrap()
-        .parse::<f64>()
+        .parse::<Price>()
         .unwrap();
 
     let mut transaction = Transaction::new_with_payer(
@@ -302,7 +302,7 @@ async fn it_works() {
 
     let instruction = Instruction::new_with_borsh(
         program_id,
-        &SplStoreInstruction::UpdatePrice(13.37 as Price),
+        &SplStoreInstruction::UpdatePrice(37),
         vec![AccountMeta::new(store.pubkey(), false)],
     );
 
@@ -320,11 +320,11 @@ async fn it_works() {
         .await
         .unwrap();
 
-    assert_eq!(acc.price, 13.37 as Price);
+    assert_eq!(acc.price, 37);
 
     // Buy some tokens =============================================================
 
-    let amount = 0.000_000_014 as Amount;
+    let amount = 14;
 
     let transaction = Transaction::new_signed_with_payer(
         &[Instruction::new_with_borsh(
@@ -351,7 +351,7 @@ async fn it_works() {
 
     assert_eq!(
         banks_client.get_balance(store.pubkey()).await.unwrap(),
-        3_199_999_999_813
+        2_682_000_000_000
     );
     let client_acc_data = unpack_account_data(&mut banks_client, client_ata_pubkey)
         .await
@@ -364,7 +364,7 @@ async fn it_works() {
 
     // Sell some tokens =============================================================
 
-    let amount = 0.000_000_007 as Amount;
+    let amount = 7;
 
     let transaction = Transaction::new_signed_with_payer(
         &[Instruction::new_with_borsh(
@@ -391,7 +391,7 @@ async fn it_works() {
 
     assert_eq!(
         banks_client.get_balance(store.pubkey()).await.unwrap(),
-        3_199_999_999_906
+        2_941_000_000_000
     );
     let client_acc_data = unpack_account_data(&mut banks_client, client_ata_pubkey)
         .await

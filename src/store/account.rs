@@ -18,7 +18,6 @@ pub struct StoreAccount {
 
 impl StoreAccount {
     pub fn update_price(account_info: &AccountInfo, new_price: Price) -> ProgramResult {
-        ensure!(new_price > 0 as Price, SplStoreError::InvalidPrice.into());
         let mut store_account: StoreAccount =
             borsh::BorshDeserialize::try_from_slice(&account_info.data.borrow())?;
         store_account.price = new_price;

@@ -27,6 +27,8 @@ pub enum SplStoreError {
     WrongAccountMint,
     #[error("Unexpected ATA address")]
     UnexpectedAtaAddress,
+    #[error("Account is not store administrator")]
+    AccountNotAdmin,
 }
 
 impl From<SplStoreError> for ProgramError {

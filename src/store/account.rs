@@ -20,12 +20,21 @@ use crate::{
 #[derive(Debug, Default, BorshSerialize, BorshDeserialize)]
 pub struct StoreAccount {
     pub price: Price,
+    pub admin: Pubkey,
 }
 
 impl StoreAccount {
-    pub fn update_price(account_info: &AccountInfo, new_price: Price) -> ProgramResult {
+    pub fn update_price(
+        account_info: &AccountInfo,
+        admin_account_info: &AccountInfo,
+        new_price: Price,
+    ) -> ProgramResult {
         let mut store_account: StoreAccount =
             borsh::BorshDeserialize::try_from_slice(&account_info.data.borrow())?;
+        ensure!(
+            store_account.admin == *admin_account_info.key,
+            SplStoreError::AccountNotAdmin.into()
+        );
         store_account.price = new_price;
         borsh::BorshSerialize::serialize(
             &store_account,

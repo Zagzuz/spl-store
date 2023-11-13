@@ -131,13 +131,9 @@ async fn it_works() {
     let program_id = Pubkey::new_unique();
 
     let store = Keypair::new();
-    store.pubkey();
-
     let client = Keypair::new();
-    client.pubkey();
-
     let token_mint = Keypair::new();
-    token_mint.pubkey();
+    let admin = Keypair::new();
 
     let store_ata_pubkey = get_associated_token_address(&store.pubkey(), &token_mint.pubkey());
 
@@ -256,6 +252,7 @@ async fn it_works() {
                 AccountMeta::new(token_mint.pubkey(), false),
                 AccountMeta::new(system_program_pubkey, false),
                 AccountMeta::new(spl_token_program_pubkey, false),
+                AccountMeta::new(admin.pubkey(), false),
                 AccountMeta::new(ata_program_pubkey, false),
             ],
         )],
@@ -295,7 +292,10 @@ async fn it_works() {
     let instruction = Instruction::new_with_borsh(
         program_id,
         &SplStoreInstruction::UpdatePrice(37),
-        vec![AccountMeta::new(store.pubkey(), false)],
+        vec![
+            AccountMeta::new(store.pubkey(), false),
+            AccountMeta::new(admin.pubkey(), false),
+        ],
     );
 
     let message = Message::new(&[instruction], Some(&payer.pubkey()));
@@ -343,7 +343,7 @@ async fn it_works() {
 
     assert_eq!(
         banks_client.get_balance(store.pubkey()).await.unwrap(),
-        31_482_200_946_560
+        31_482_201_169_280
     );
     let client_acc_data = unpack_account_data(&mut banks_client, client_ata_pubkey)
         .await
@@ -383,7 +383,7 @@ async fn it_works() {
 
     assert_eq!(
         banks_client.get_balance(store.pubkey()).await.unwrap(),
-        31_741_200_946_560
+        31_741_201_169_280
     );
     let client_acc_data = unpack_account_data(&mut banks_client, client_ata_pubkey)
         .await

@@ -13,9 +13,10 @@ use crate::{
 pub fn process(_program_id: &Pubkey, accounts: &[AccountInfo], new_price: Price) -> ProgramResult {
     let accounts_info_iter = &mut accounts.iter();
     let account_info = next_account_info(accounts_info_iter)?;
+    let admin_account_info = next_account_info(accounts_info_iter)?;
     ensure!(
         account_info.is_writable,
         SplStoreError::AccountNotWritable.into()
     );
-    StoreAccount::update_price(account_info, new_price)
+    StoreAccount::update_price(account_info, admin_account_info, new_price)
 }

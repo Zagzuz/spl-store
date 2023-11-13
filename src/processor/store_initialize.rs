@@ -26,6 +26,7 @@ pub fn process(
     let token_mint_account_info = next_account_info(accounts_info_iter)?;
     let system_program_account_info = next_account_info(accounts_info_iter)?;
     let spl_token_program_account_info = next_account_info(accounts_info_iter)?;
+    let admin_account_info = next_account_info(accounts_info_iter)?;
 
     if store_account_info.lamports() == 0 {
         StoreAccount::initialize_account(
@@ -40,7 +41,16 @@ pub fn process(
         ProgramError::IncorrectProgramId
     );
 
-    StoreAccount::update_price(&store_account_info, price)?;
+    let mut store_account: StoreAccount =
+        borsh::BorshDeserialize::try_from_slice(&store_account_info.data.borrow())?;
+
+    store_account.admin = admin_account_info.key.clone();
+    store_account.price = price;
+
+    borsh::BorshSerialize::serialize(
+        &store_account,
+        &mut &mut store_account_info.data.borrow_mut()[..],
+    )?;
     msg!("Token initial price set to {}", price);
 
     if store_ata_info.lamports() == 0 {
